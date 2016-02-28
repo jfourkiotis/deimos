@@ -6,8 +6,13 @@
     
     > 1
     1
+    > #t
+    #t
+    > #f
+    #f
     > ^C
 
 ### changes
 
+* v0.2   Support for booleans #f and #t
 * v0.1   Support for integers
