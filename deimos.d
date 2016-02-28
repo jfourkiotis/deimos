@@ -1,11 +1,19 @@
 import std.stdio : writeln, write;
+import std.conv;
 import core.stdc.stdio;
 import core.stdc.ctype;
 import core.stdc.stdlib;
 import std.variant;
 
 // scheme value
-alias Object = Algebraic!(long);
+alias Object = Algebraic!(long, bool);
+/*
+class ConsCell
+{
+    Object car;
+    Object cdr;
+}
+*/
 
 // READ
 bool isDelimiter(int c)
@@ -44,7 +52,20 @@ Object read(FILE *stream)
     int c = getc(stream);
     int sign = 1;
     long num = 0;
-    if (isdigit(c) || (c == '-' && isdigit(peek(stream))))
+    if (c == '#') /* read a boolean */
+    {
+        c = getc(stream);
+        switch (c)
+        {
+            case 't':
+                return Object(true);
+            case 'f':
+                return Object(false);
+            default:
+                fprintf(stderr, "Unknown boolean literal\n");
+                exit(-1);
+        }
+    } else if (isdigit(c) || (c == '-' && isdigit(peek(stream))))
     {
         if (c == '-') sign = -1;
         else 
@@ -76,7 +97,9 @@ Object eval(Object exp)
 // PRINT
 void print(Object obj)
 {
-    writeln(obj);
+    auto str = obj.visit!((bool b) => b ? "#t" : "#f",
+                          (long n) => to!string(n));
+    write(str);
 }
 
 void main()
