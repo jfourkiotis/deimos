@@ -7,15 +7,20 @@ import core.stdc.stdlib;
 
 struct EmptyList {};
 
-// scheme value
-alias Object = Algebraic!(long, bool, char, string, EmptyList);
-/*
 class ConsCell
 {
     Object car;
     Object cdr;
+
+    this(Object car, Object cdr)
+    {
+        this.car = car;
+        this.cdr = cdr;
+    }
 }
-*/
+
+// scheme value
+alias Object = Algebraic!(long, bool, char, string, EmptyList, ConsCell);
 
 // READ
 bool isDelimiter(int c)
@@ -101,6 +106,47 @@ Object readCharacter(FILE *stream)
     return Object(to!char(c));
 }
 
+Object readPair(FILE *stream)
+{
+    eatWhitespace(stream);
+
+    int c = getc(stream);
+    if (c == ')') 
+    {
+        return Object(EmptyList());
+    }
+    ungetc(c, stream);
+
+    Object car = read(stream);
+
+    eatWhitespace(stream);
+
+    c = getc(stream);
+    if (c == '.') /* read improper list */
+    {
+        c = peek(stream);
+        if (!isDelimiter(c))
+        {
+            fprintf(stderr, "Dot not followed by delimiter\n");
+            exit(-1);
+        }
+        Object cdr = read(stream);
+        eatWhitespace(stream);
+        c = getc(stream);
+        if (c != ')')
+        {
+            fprintf(stderr, "Where was that trailing right paren?\n");
+            exit(-1);
+        }
+        return Object(new ConsCell(car, cdr));
+    } else /* read list */
+    {
+        ungetc(c, stream);
+        Object cdr = readPair(stream);
+        return Object(new ConsCell(car, cdr));
+    }
+}
+
 Object read(FILE *stream)
 {
     eatWhitespace(stream);
@@ -158,18 +204,9 @@ Object read(FILE *stream)
             buffer ~= c;
         }
         return Object(buffer.idup);
-    } else if (c == '(') /* read the empty list */
+    } else if (c == '(') /* read the empty list or pair */
     {
-        eatWhitespace(stream);
-        c = getc(stream);
-        if (c == ')')
-        {
-            return Object(EmptyList());
-        } else 
-        {
-            fprintf(stderr, "Unexpected character '%c'. Expecting ')'\n", c);
-            exit(-1);
-        }
+        return readPair(stream);
     } else 
     {
         fprintf(stderr, "Bad input. Unexpected '%c'\n", c);
@@ -208,14 +245,37 @@ string strToString(string s)
     return buffer.idup;
 }
 
+string cellToString(ConsCell cell)
+{
+    Object car = cell.car;
+    Object cdr = cell.cdr;
+ 
+    string s1 = objToString(car);
+    if (cdr.peek!(ConsCell))
+    {
+        return s1 ~ " " ~ cellToString(*cdr.peek!(ConsCell));
+    } else if (cdr.peek!(EmptyList))
+    {
+        return s1;
+    } else 
+    {
+        return s1 ~ " . " ~ objToString(cdr);
+    }
+}
+
+string objToString(Object obj)
+{
+    return obj.visit!((bool b)   => b ? "#t" : "#f",
+            (long n)   => to!string(n)   ,
+            (char c)   => charToString(c),
+            (string s) => strToString(s) ,
+            (EmptyList empty) => "()"    ,
+            (ConsCell cell)   => "(" ~ cellToString(cell) ~ ")");
+}
+
 void print(Object obj)
 {
-    auto str = obj.visit!((bool b)   => b ? "#t" : "#f",
-                          (long n)   => to!string(n),
-                          (char c)   => charToString(c),
-                          (string s) => strToString(s),
-                          (EmptyList empty) => "()");
-    write(str);
+   write(objToString(obj));
 }
 
 void main()
