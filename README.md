@@ -14,10 +14,13 @@
     #\c
     >"asdf"
     "asdf"
+    >()
+    ()
     > ^C
 
 ### changes
 
+* v0.5   Empty list literal
 * v0.4   String literals
 * v0.3   Support for character literals
 * v0.2   Support for booleans #f and #t

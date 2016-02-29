@@ -5,8 +5,10 @@ import core.stdc.stdio;
 import core.stdc.ctype;
 import core.stdc.stdlib;
 
+struct EmptyList {};
+
 // scheme value
-alias Object = Algebraic!(long, bool, char, string);
+alias Object = Algebraic!(long, bool, char, string, EmptyList);
 /*
 class ConsCell
 {
@@ -156,6 +158,18 @@ Object read(FILE *stream)
             buffer ~= c;
         }
         return Object(buffer.idup);
+    } else if (c == '(') /* read the empty list */
+    {
+        eatWhitespace(stream);
+        c = getc(stream);
+        if (c == ')')
+        {
+            return Object(EmptyList());
+        } else 
+        {
+            fprintf(stderr, "Unexpected character '%c'. Expecting ')'\n", c);
+            exit(-1);
+        }
     } else 
     {
         fprintf(stderr, "Bad input. Unexpected '%c'\n", c);
@@ -199,7 +213,8 @@ void print(Object obj)
     auto str = obj.visit!((bool b)   => b ? "#t" : "#f",
                           (long n)   => to!string(n),
                           (char c)   => charToString(c),
-                          (string s) => strToString(s));
+                          (string s) => strToString(s),
+                          (EmptyList empty) => "()");
     write(str);
 }
 
