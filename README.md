@@ -10,9 +10,12 @@
     #t
     > #f
     #f
+    >#\c
+    #\c
     > ^C
 
 ### changes
 
+* v0.3   Support for character literals
 * v0.2   Support for booleans #f and #t
 * v0.1   Support for integers

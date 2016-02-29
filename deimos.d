@@ -6,7 +6,7 @@ import core.stdc.stdlib;
 import std.variant;
 
 // scheme value
-alias Object = Algebraic!(long, bool);
+alias Object = Algebraic!(long, bool, char);
 /*
 class ConsCell
 {
@@ -46,6 +46,59 @@ void eatWhitespace(FILE *stream)
     }
 }
 
+void eatExpectedString(FILE *stream, string str)
+{
+    int c = 0;
+    foreach (char ch ; str)
+    {
+        c = getc(stream);
+        if (ch != c)
+        {
+            fprintf(stderr, "Unexpected character '%c'\n", c);
+            exit(-1);
+        }
+    }
+}
+
+void peekExpectedDelimiter(FILE *stream)
+{
+    if (!isDelimiter(peek(stream)))
+    {
+        fprintf(stderr, "Character not followed by delimiter\n");
+        exit(-1);
+    }
+}
+
+Object readCharacter(FILE *stream)
+{
+    int c = getc(stream);
+    switch (c)
+    {
+        case EOF:
+            fprintf(stderr, "Incomplete character literal\n");
+            exit(-1);
+        case 's':
+            if (peek(stream) == 'p')
+            {
+                eatExpectedString(stream, "pace");
+                peekExpectedDelimiter(stream);
+                return Object(' ');
+            }
+            break;
+        case 'n':
+            if (peek(stream) == 'e')
+            {
+                eatExpectedString(stream, "ewline");
+                peekExpectedDelimiter(stream);
+                return Object('\n');
+            }
+            break;
+        default: break;
+    }
+    peekExpectedDelimiter(stream);
+    return Object(to!char(c));
+}
+
 Object read(FILE *stream)
 {
     eatWhitespace(stream);
@@ -61,6 +114,8 @@ Object read(FILE *stream)
                 return Object(true);
             case 'f':
                 return Object(false);
+            case '\\':
+                return readCharacter(stream);
             default:
                 fprintf(stderr, "Unknown boolean literal\n");
                 exit(-1);
@@ -95,10 +150,18 @@ Object eval(Object exp)
 }
 
 // PRINT
+string charToString(char c)
+{
+    if (c == '\n') return "#\\newline";
+    else if (c == ' ') return "#\\space";
+    else return "#\\" ~ to!string(c);
+}
+
 void print(Object obj)
 {
     auto str = obj.visit!((bool b) => b ? "#t" : "#f",
-                          (long n) => to!string(n));
+                          (long n) => to!string(n),
+                          (char c) => charToString(c));
     write(str);
 }
 
