@@ -1,12 +1,12 @@
 import std.stdio : writeln, write;
 import std.conv;
+import std.variant;
 import core.stdc.stdio;
 import core.stdc.ctype;
 import core.stdc.stdlib;
-import std.variant;
 
 // scheme value
-alias Object = Algebraic!(long, bool, char);
+alias Object = Algebraic!(long, bool, char, string);
 /*
 class ConsCell
 {
@@ -135,6 +135,27 @@ Object read(FILE *stream)
             ungetc(c, stream);
             return Object(num);
         }
+    } else if (c == '"') /* read a string */
+    {
+        char[] buffer;
+        while ((c = getc(stream)) != '"')
+        {
+            if (c == '\\')
+            {
+                c = getc(stream);
+                if (c == 'n')
+                {
+                    c = '\n';
+                }
+            }
+            if (c == EOF)
+            {
+                fprintf(stderr, "Non-terminated string literal\n");
+                exit(-1);
+            }
+            buffer ~= c;
+        }
+        return Object(buffer.idup);
     } else 
     {
         fprintf(stderr, "Bad input. Unexpected '%c'\n", c);
@@ -157,11 +178,28 @@ string charToString(char c)
     else return "#\\" ~ to!string(c);
 }
 
+string strToString(string s)
+{
+    char[] buffer;
+
+    buffer ~= '"';
+    foreach (char c ; s)
+    {
+        if (c == '\n') buffer ~= "\\n";
+        else if (c == '\\') buffer ~= "\\\\";
+        else if (c == '"') buffer ~= "\\\"";
+        else buffer ~= c;
+    }
+    buffer ~= '"';
+    return buffer.idup;
+}
+
 void print(Object obj)
 {
-    auto str = obj.visit!((bool b) => b ? "#t" : "#f",
-                          (long n) => to!string(n),
-                          (char c) => charToString(c));
+    auto str = obj.visit!((bool b)   => b ? "#t" : "#f",
+                          (long n)   => to!string(n),
+                          (char c)   => charToString(c),
+                          (string s) => strToString(s));
     write(str);
 }
 
