@@ -20,7 +20,9 @@ class ConsCell
 }
 
 // scheme value
-alias Object = Algebraic!(long, bool, char, string, EmptyList, ConsCell);
+// string type is used for symbols
+// char[] type is used for strings
+alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell);
 
 // READ
 bool isDelimiter(int c)
@@ -28,6 +30,12 @@ bool isDelimiter(int c)
     return isspace(c) || c == EOF ||
            c == '('   || c == ')' ||
            c == '"'   || c == ';';
+}
+
+bool isInitial(int c)
+{
+    return isalpha(c) || c == '*' || c == '/' || c == '>' ||
+             c == '<' || c == '=' || c == '?' || c == '!';
 }
 
 int peek(FILE *stream)
@@ -183,6 +191,23 @@ Object read(FILE *stream)
             ungetc(c, stream);
             return Object(num);
         }
+    } else if (isInitial(c) || ((c == '+' || c == '-') && isDelimiter(peek(stream)))) /* read a symbol */
+    {
+        char[] buffer;
+        while (isInitial(c) || isdigit(c) || c == '+' || c == '-')
+        {
+            buffer ~= c;
+            c = getc(stream);
+        }
+        if (isDelimiter(c))
+        {
+            ungetc(c, stream);
+            return Object(buffer.idup);
+        } else 
+        {
+            fprintf(stderr, "Symbol not followed by delimiter. Found '%c'\n", c);
+            exit(-1);
+        }
     } else if (c == '"') /* read a string */
     {
         char[] buffer;
@@ -203,7 +228,7 @@ Object read(FILE *stream)
             }
             buffer ~= c;
         }
-        return Object(buffer.idup);
+        return Object(buffer);
     } else if (c == '(') /* read the empty list or pair */
     {
         return readPair(stream);
@@ -229,7 +254,7 @@ string charToString(char c)
     else return "#\\" ~ to!string(c);
 }
 
-string strToString(string s)
+string strToString(immutable char[] s)
 {
     char[] buffer;
 
@@ -265,10 +290,12 @@ string cellToString(ConsCell cell)
 
 string objToString(Object obj)
 {
-    return obj.visit!((bool b)   => b ? "#t" : "#f",
+    return obj.visit!(
+            (bool b)   => b ? "#t" : "#f",
             (long n)   => to!string(n)   ,
             (char c)   => charToString(c),
-            (string s) => strToString(s) ,
+            (string s) => s              ,
+            (char[] s) => strToString(s.idup) ,
             (EmptyList empty) => "()"    ,
             (ConsCell cell)   => "(" ~ cellToString(cell) ~ ")");
 }

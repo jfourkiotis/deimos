@@ -20,10 +20,13 @@
     (0 . 1)
     > (0 1 2 3)
     (0 1 2 3)
+    > asdf
+    asdf
     > ^C
 
 ### changes
 
+* v0.7   Symbol literals
 * v0.6   List literals
 * v0.5   Empty list literal
 * v0.4   String literals
