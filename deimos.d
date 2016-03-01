@@ -19,10 +19,34 @@ class ConsCell
     }
 }
 
+Object car(Object object)
+{
+    return (*object.peek!(ConsCell)).car;
+}
+
+Object cdr(Object object)
+{
+    return (*object.peek!(ConsCell)).cdr;
+}
+
+Object cadr(Object object)
+{
+    return car(cdr(object));
+}
+
 // scheme value
 // string type is used for symbols
 // char[] type is used for strings
 alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell);
+
+struct Symbols
+{
+    static this()
+    {
+        QUOTE = Object("quote");
+    }
+    static Object QUOTE;
+}
 
 // READ
 bool isDelimiter(int c)
@@ -232,6 +256,9 @@ Object read(FILE *stream)
     } else if (c == '(') /* read the empty list or pair */
     {
         return readPair(stream);
+    } else if (c == '\'') /* read quoted expression */
+    {
+        return Object(new ConsCell(Symbols.QUOTE, Object(new ConsCell(read(stream), Object(EmptyList())))));
     } else 
     {
         fprintf(stderr, "Bad input. Unexpected '%c'\n", c);
@@ -241,9 +268,45 @@ Object read(FILE *stream)
 }
 
 // EVAL
-Object eval(Object exp)
+bool isSelfEvaluating(Object expression)
 {
-    return exp;
+    return expression.peek!(bool) || expression.peek!(long) || expression.peek!(char) || expression.peek!(char[]);
+}
+
+bool isTaggedList(Object expression, Object tag)
+{
+    if (expression.peek!(ConsCell))
+    {
+        auto car = (*expression.peek!(ConsCell)).car;
+        return car == Symbols.QUOTE;
+    }
+    return false;
+}
+
+bool isQuoted(Object expression)
+{
+    return isTaggedList(expression, Symbols.QUOTE);
+}
+
+Object textOfQuotation(Object expression)
+{
+    return cadr(expression);
+}
+
+Object eval(Object expression)
+{
+    if (isSelfEvaluating(expression))
+    {
+        return expression;
+    } else if (isQuoted(expression))
+    {
+        return textOfQuotation(expression);
+    } else 
+    {
+        fprintf(stderr, "Cannot eval unknown expression type\n");
+        exit(-1);
+    }
+    assert(0);
 }
 
 // PRINT

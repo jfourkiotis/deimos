@@ -4,28 +4,32 @@
 
 ### example
     
+    $ Welcome to Deimos Scheme. Use ctrl-c to exit.
     > 1
     1
     > #t
     #t
     > #f
     #f
+    > -123; comment
+    -123
     > #\c
     #\c
     > "asdf"
     "asdf"
-    > ()
+    > (quote ())
     ()
-    > (0 . 1)
+    > (quote (0 . 1))
     (0 . 1)
-    > (0 1 2 3)
+    > (quote (0 1 2 3))
     (0 1 2 3)
-    > asdf
+    > (quote asdf)
     asdf
     > ^C
 
 ### changes
 
+* v0.8   Expression quoting
 * v0.7   Symbol literals
 * v0.6   List literals
 * v0.5   Empty list literal
