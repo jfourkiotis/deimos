@@ -25,10 +25,19 @@
     (0 1 2 3)
     > (quote asdf)
     asdf
+    > (define x 10)
+    ok
+    > x
+    10
+    > (set! x 20)
+    ok
+    > x
+    20
     > ^C
 
 ### changes
 
+* v0.9   Forms `define` and `set!`.
 * v0.8   Expression quoting
 * v0.7   Symbol literals
 * v0.6   List literals

@@ -5,6 +5,99 @@ import core.stdc.stdio;
 import core.stdc.ctype;
 import core.stdc.stdlib;
 
+class Environment
+{
+    Environment base;
+    Object[string] frame;
+
+    static this()
+    {
+        Empty = new Environment(null);
+        Global= Environment.Setup();
+    }
+
+    this(Environment base)
+    {
+        this.base = base;
+    }
+
+    Environment EnclosingEnvironment()
+    {
+        return base;
+    }
+
+    Object Lookup(string name)
+    {
+        if (name in frame)
+        {
+            return frame[name];
+        } else if (base)
+        {
+            return base.Lookup(name);
+        } else 
+        {
+            fprintf(stderr, "Unbound variable '%s'", name.ptr);
+            exit(-1);
+        }
+        assert(0);
+    }
+
+    void SetVariable(string name, Object value)
+    {
+        if (this == Empty)
+        {
+            fprintf(stderr, "Unbound variable '%s'", name.ptr);
+            exit(-1);
+        } else if (name in frame)
+        {
+            frame[name] = value;
+        } else if (base)
+        {
+            base.SetVariable(name, value);
+        } else 
+        {
+            fprintf(stderr, "Fatal error");
+            exit(-1);
+        }
+    }
+
+    void DefineVariable(string name, Object value)
+    {
+        frame[name] = value;
+    }
+
+    static Environment Extend(Object params, Object args, Environment env)
+    {
+        auto new_env = new Environment(env);
+
+        Object nil = Object(EmptyList());
+        while (params != nil)
+        {
+            string *symbol = car(params).peek!(string);
+            if (symbol)
+            {
+                new_env.DefineVariable(*symbol, car(args));
+            } else 
+            {
+                fprintf(stderr, "Invalid param");
+                exit(-1);
+                params = cdr(params);
+                args = cdr(args);
+            }
+        }
+
+        return new_env;
+    }
+
+    static Environment Setup()
+    {
+        return Extend(Object(EmptyList()), Object(EmptyList()), Empty);
+    }
+
+    static Environment Empty;
+    static Environment Global;
+}
+
 struct EmptyList {};
 
 class ConsCell
@@ -39,13 +132,30 @@ Object cadr(Object object)
 // char[] type is used for strings
 alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell);
 
+bool isSymbol(Object object)
+{
+    return object.peek!(string) !is null;
+}
+
+bool isVariable(Object object)
+{
+    return isSymbol(object);
+}
+
 struct Symbols
 {
     static this()
     {
         QUOTE = Object("quote");
+        DEFINE= Object("define");
+        SET   = Object("set!");
+        OK    = Object("ok");
     }
+
     static Object QUOTE;
+    static Object DEFINE;
+    static Object SET;
+    static Object OK;
 }
 
 // READ
@@ -278,7 +388,7 @@ bool isTaggedList(Object expression, Object tag)
     if (expression.peek!(ConsCell))
     {
         auto car = (*expression.peek!(ConsCell)).car;
-        return car == Symbols.QUOTE;
+        return car == tag;
     }
     return false;
 }
@@ -293,17 +403,76 @@ Object textOfQuotation(Object expression)
     return cadr(expression);
 }
 
-Object eval(Object expression)
+bool isAssignment(Object expression)
+{
+    return isTaggedList(expression, Symbols.SET);
+}
+
+Object assignmentVariable(Object expression)
+{
+    return cadr(expression);
+}
+
+Object assignmentValue(Object expression)
+{
+    return cadr(cdr(expression));
+}
+
+Object evalAssignment(Object expression, Environment env)
+{
+    Object variable = assignmentVariable(expression);
+    string *name = variable.peek!(string);
+    //TODO: error handling
+    env.SetVariable(*name, eval(assignmentValue(expression), env));
+    return Symbols.OK;
+}
+
+Object evalDefinition(Object expression, Environment env)
+{
+    Object variable = definitionVariable(expression);
+    string *name = variable.peek!(string);
+    //TODO: error handling
+    env.DefineVariable(*name, eval(definitionValue(expression), env));
+    return Symbols.OK;
+}
+
+bool isDefinition(Object expression)
+{
+    return isTaggedList(expression, Symbols.DEFINE);
+}  
+
+Object definitionVariable(Object expression)
+{
+    return cadr(expression);
+}
+
+Object definitionValue(Object expression)
+{
+    return cadr(cdr(expression));
+}
+
+Object eval(Object expression, Environment env)
 {
     if (isSelfEvaluating(expression))
     {
         return expression;
+    } else if (isVariable(expression))
+    {
+        string *name = expression.peek!(string);
+        return env.Lookup(*name);
     } else if (isQuoted(expression))
     {
         return textOfQuotation(expression);
+    } else if (isAssignment(expression))
+    {
+        return evalAssignment(expression, env);
+    } else if (isDefinition(expression))
+    {
+        return evalDefinition(expression, env);
     } else 
     {
         fprintf(stderr, "Cannot eval unknown expression type\n");
+        writeln(expression);
         exit(-1);
     }
     assert(0);
@@ -374,7 +543,7 @@ void main()
     while (true)
     {
         write("> ");
-        print(eval(read(stdin)));
+        print(eval(read(stdin), Environment.Global));
         write("\n");
     }
 }
