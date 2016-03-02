@@ -37,11 +37,19 @@
     1
     > (+ 1 2)
     3
+    > ((lambda (x) x) 1)
+    1
+    > (define (add x y) (+ x y))
+    ok
+    > (add 1 2)
+    3
+    > add
+    #<compound-procedure>
     > ^C
 
 ### changes
 
-
+* v0.13  compound procedure support + lambda functions
 * v0.11  Initial support for primitive procedures (`+`)
 * v0.10  Support for the `if` form
 * v0.9   Forms `define` and `set!`

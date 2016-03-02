@@ -81,9 +81,9 @@ class Environment
             {
                 fprintf(stderr, "Invalid param");
                 exit(-1);
-                params = cdr(params);
-                args = cdr(args);
             }
+            params = cdr(params);
+            args = cdr(args);
         }
 
         return new_env;
@@ -112,6 +112,20 @@ class ConsCell
     }
 }
 
+class CompoundProc
+{
+    Object params;
+    Object procBody;
+    Environment env;
+
+    this(Object params, Object pbody, Environment env)
+    {
+        this.params = params;
+        this.procBody = pbody;
+        this.env = env;
+    }
+}
+
 Object car(Object object)
 {
     return (*object.peek!(ConsCell)).car;
@@ -130,7 +144,7 @@ Object cadr(Object object)
 // scheme value
 // string type is used for symbols
 // char[] type is used for strings
-alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*));
+alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*), CompoundProc);
 
 bool isSymbol(Object object)
 {
@@ -151,6 +165,7 @@ struct Symbols
         SET   = Object("set!");
         OK    = Object("ok");
         IF    = Object("if");
+        LAMBDA= Object("lambda");
     }
 
     static Object QUOTE;
@@ -158,6 +173,7 @@ struct Symbols
     static Object SET;
     static Object OK;
     static Object IF;
+    static Object LAMBDA;
 }
 
 // READ
@@ -445,12 +461,24 @@ bool isDefinition(Object expression)
 
 Object definitionVariable(Object expression)
 {
-    return cadr(expression);
+    if (cadr(expression).peek!(string) !is null)
+    {
+        return cadr(expression);
+    } else 
+    {
+        return car(cadr(expression));
+    }
 }
 
 Object definitionValue(Object expression)
 {
-    return cadr(cdr(expression));
+    if (cadr(expression).peek!(string) !is null)
+    {
+        return cadr(cdr(expression));
+    } else 
+    {
+        return makeLambda(cdr(cadr(expression)), cdr(cdr(expression)));
+    }
 }
 
 // if
@@ -479,6 +507,43 @@ Object ifExpressionAlternative(Object expression)
     {
         return cadr(cdr(cdr(expression)));
     }
+}
+
+// lambda
+// (lambda (<args>) <body>)
+bool isLambda(Object expression)
+{
+    return isTaggedList(expression, Symbols.LAMBDA);
+}
+
+Object lambdaParameters(Object expression)
+{
+    return cadr(expression);
+}
+
+Object lambdaBody(Object expression)
+{
+    return cdr(cdr(expression));
+}
+
+Object makeLambda(Object params, Object lbody)
+{
+    return Object(new ConsCell(Symbols.LAMBDA, Object(new ConsCell(params, lbody))));
+}
+
+bool isLastExpression(Object seq)
+{
+    return cdr(seq) == Object(EmptyList());
+}
+
+Object firstExpression(Object seq)
+{
+    return car(seq);
+}
+
+Object restExpressions(Object seq)
+{
+    return cdr(seq);
 }
 
 // application
@@ -554,6 +619,11 @@ tailcall:
             expression = ifExpressionAlternative(expression);
         }
         goto tailcall;
+    } else if (isLambda(expression))
+    {
+        auto params = lambdaParameters(expression);
+        auto lbody  = lambdaBody(expression);
+        return Object(new CompoundProc(params, lbody, env));
     } else if (isApplication(expression))
     {
         auto operator = applicationOperator(expression);
@@ -561,9 +631,29 @@ tailcall:
         auto operands = applicationOperands(expression);
         auto arguments= listOfValues(operands, env);
 
-        Object ret;
-        procedure(&arguments, &ret);
-        return ret;
+        if (procedure.peek!(void function(Object *, Object *)) !is null)
+        {
+            Object ret;
+            procedure(&arguments, &ret);
+            return ret;
+        } else if (procedure.peek!(CompoundProc) != null)
+        {
+            auto cp = *procedure.peek!(CompoundProc);
+            env = Environment.Extend(cp.params, arguments, cp.env);
+            expression = cp.procBody;
+            while (!isLastExpression(expression))
+            {
+                eval(firstExpression(expression), env);
+                expression = restExpressions(expression);
+            }
+
+            expression = firstExpression(expression);
+            goto tailcall;
+        } else 
+        {
+            fprintf(stderr, "Unknown procedure type\n");
+            exit(-1);
+        }
     } else 
     {
         fprintf(stderr, "Cannot eval unknown expression type\n");
@@ -625,7 +715,8 @@ string objToString(Object obj)
             (char[] s) => strToString(s.idup) ,
             (EmptyList empty) => "()"    ,
             (ConsCell cell)   => "(" ~ cellToString(cell) ~ ")",
-            (void function(Object*, Object*) prim) => "<#procedure>");
+            (void function(Object*, Object*) prim) => "<#procedure>",
+            (CompoundProc cp) => "<#compound-procedure>");
 }
 
 void print(Object obj)
@@ -645,9 +736,25 @@ void addProc(Object *args, Object *ret)
     *ret = result;
 }
 
+void areNumEqual(Object *args, Object *ret)
+{
+    Object current = *args;
+    long value = car(current).get!(long);
+    while ((current = cdr(current)) != Object(EmptyList()))
+    {
+        if (value != car(current).get!(long))
+        {
+            *ret = Object(false);
+            return;
+        }
+    }
+    *ret = Object(true);
+}
+
 void main()
 {
     Environment.Global.DefineVariable("+", Object(&addProc));
+    Environment.Global.DefineVariable("=", Object(&areNumEqual));
 
     writeln("Welcome to Deimos Scheme. Use ctrl-c to exit.");
     while (true)
