@@ -33,11 +33,18 @@
     ok
     > x
     20
+    > (if #t 1 2)
+    1
+    > (+ 1 2)
+    3
     > ^C
 
 ### changes
 
-* v0.9   Forms `define` and `set!`.
+
+* v0.11  Initial support for primitive procedures (`+`)
+* v0.10  Support for the `if` form
+* v0.9   Forms `define` and `set!`
 * v0.8   Expression quoting
 * v0.7   Symbol literals
 * v0.6   List literals

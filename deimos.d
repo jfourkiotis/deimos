@@ -130,7 +130,7 @@ Object cadr(Object object)
 // scheme value
 // string type is used for symbols
 // char[] type is used for strings
-alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell);
+alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*));
 
 bool isSymbol(Object object)
 {
@@ -150,12 +150,14 @@ struct Symbols
         DEFINE= Object("define");
         SET   = Object("set!");
         OK    = Object("ok");
+        IF    = Object("if");
     }
 
     static Object QUOTE;
     static Object DEFINE;
     static Object SET;
     static Object OK;
+    static Object IF;
 }
 
 // READ
@@ -451,8 +453,79 @@ Object definitionValue(Object expression)
     return cadr(cdr(expression));
 }
 
+// if
+bool isIfExpression(Object expression)
+{
+    return isTaggedList(expression, Symbols.IF);
+}
+
+Object ifExpressionPredicate(Object expression)
+{
+    return cadr(expression);
+}
+
+Object ifExpressionConsequent(Object expression)
+{
+    return cadr(cdr(expression));
+}
+
+Object ifExpressionAlternative(Object expression)
+{
+    if (cdr(cdr(cdr(expression))) == Object(EmptyList()))
+    {
+
+        return Object(false);
+    } else 
+    {
+        return cadr(cdr(cdr(expression)));
+    }
+}
+
+// application
+bool isApplication(Object expression)
+{
+    return expression.peek!(ConsCell) !is null;
+}   
+
+Object applicationOperator(Object expression)
+{
+    return car(expression);
+}
+
+Object applicationOperands(Object expression)
+{
+    return cdr(expression);
+}
+
+Object firstOperand(Object ops)
+{
+    return car(ops);
+}
+
+Object restOperands(Object ops)
+{
+    return cdr(ops);
+}
+
+bool isNoOperands(Object ops)
+{
+    return ops == Object(EmptyList());
+}
+
+Object listOfValues(Object expressions, Environment env)
+{
+    if (isNoOperands(expressions))
+    {
+        return Object(EmptyList());
+    }
+    auto first = eval(firstOperand(expressions), env);
+    auto rest  = listOfValues(restOperands(expressions), env);
+    return Object(new ConsCell(first, rest));
+}
+
 Object eval(Object expression, Environment env)
 {
+tailcall:
     if (isSelfEvaluating(expression))
     {
         return expression;
@@ -469,6 +542,28 @@ Object eval(Object expression, Environment env)
     } else if (isDefinition(expression))
     {
         return evalDefinition(expression, env);
+    } else if (isIfExpression(expression))
+    {
+        auto pred = ifExpressionPredicate(expression);
+        auto pred_value = eval(pred, env);
+        if (pred_value != false)
+        {
+            expression = ifExpressionConsequent(expression);
+        } else 
+        {
+            expression = ifExpressionAlternative(expression);
+        }
+        goto tailcall;
+    } else if (isApplication(expression))
+    {
+        auto operator = applicationOperator(expression);
+        auto procedure= eval(operator, env);
+        auto operands = applicationOperands(expression);
+        auto arguments= listOfValues(operands, env);
+
+        Object ret;
+        procedure(&arguments, &ret);
+        return ret;
     } else 
     {
         fprintf(stderr, "Cannot eval unknown expression type\n");
@@ -529,7 +624,8 @@ string objToString(Object obj)
             (string s) => s              ,
             (char[] s) => strToString(s.idup) ,
             (EmptyList empty) => "()"    ,
-            (ConsCell cell)   => "(" ~ cellToString(cell) ~ ")");
+            (ConsCell cell)   => "(" ~ cellToString(cell) ~ ")",
+            (void function(Object*, Object*) prim) => "<#procedure>");
 }
 
 void print(Object obj)
@@ -537,8 +633,22 @@ void print(Object obj)
    write(objToString(obj));
 }
 
+void addProc(Object *args, Object *ret)
+{
+    long result = 0;
+    Object current = *args;
+    while (current != Object(EmptyList()))
+    {
+        result += car(current).get!long;
+        current = cdr(current);
+    }
+    *ret = result;
+}
+
 void main()
 {
+    Environment.Global.DefineVariable("+", Object(&addProc));
+
     writeln("Welcome to Deimos Scheme. Use ctrl-c to exit.");
     while (true)
     {
