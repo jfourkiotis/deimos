@@ -398,7 +398,10 @@ Object read(FILE *stream)
 // EVAL
 bool isSelfEvaluating(Object expression)
 {
-    return expression.peek!(bool) || expression.peek!(long) || expression.peek!(char) || expression.peek!(char[]);
+    return expression.peek!(bool) != null || 
+           expression.peek!(long) != null ||
+           expression.peek!(char) != null || 
+           expression.peek!(char[]) != null;
 }
 
 bool isTaggedList(Object expression, Object tag)
