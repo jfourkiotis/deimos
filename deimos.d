@@ -406,9 +406,10 @@ bool isSelfEvaluating(Object expression)
 
 bool isTaggedList(Object expression, Object tag)
 {
-    if (expression.peek!(ConsCell))
+    ConsCell *cell = expression.peek!(ConsCell);
+    if (cell !is null)
     {
-        auto car = (*expression.peek!(ConsCell)).car;
+        auto car = (*cell).car;
         return car == tag;
     }
     return false;
@@ -696,7 +697,7 @@ string cellToString(ConsCell cell)
     Object cdr = cell.cdr;
  
     string s1 = objToString(car);
-    if (cdr.peek!(ConsCell))
+    if (cdr.peek!(ConsCell) !is null)
     {
         return s1 ~ " " ~ cellToString(*cdr.peek!(ConsCell));
     } else if (cdr.peek!(EmptyList))
