@@ -741,6 +741,21 @@ void isProcedureProc(Object *args, Object *ret)
     *ret = tmp.peek!(void function(Object*, Object*)) !is null ? Symbols.TRUE : Symbols.FALSE;
 }   
 
+void consProc(Object *args, Object *ret)
+{
+    *ret = Object(new ConsCell(car(*args), cadr(*args)));
+}
+
+void carProc(Object *args, Object *ret)
+{
+    *ret = car(car(*args));
+}
+
+void cdrProc(Object *args, Object *ret)
+{
+    *ret = cdr(car(*args));
+}
+
 class Environment
 {
     Environment base;
@@ -762,6 +777,9 @@ class Environment
         Global.DefineVariable("+", Object(&addProc));
         Global.DefineVariable("-", Object(&subProc));
         Global.DefineVariable("=", Object(&areNumEqual));
+        Global.DefineVariable("cons", Object(&consProc));
+        Global.DefineVariable("car", Object(&carProc));
+        Global.DefineVariable("cdr", Object(&cdrProc));
         Global.DefineVariable("exit", Object(&exitProc));
     }
 
