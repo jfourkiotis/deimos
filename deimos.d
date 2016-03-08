@@ -654,6 +654,19 @@ void addProc(Object *args, Object *ret)
     *ret = result;
 }
 
+void subProc(Object *args, Object *ret)
+{
+    Object current = *args;
+    long result = car(current).get!long;
+    
+    while ((current = cdr(current)) != Symbols.NIL)
+    {
+        result -= car(current).get!long;
+    }
+
+    *ret = result;
+}
+
 void areNumEqual(Object *args, Object *ret)
 {
     Object current = *args;
@@ -747,6 +760,7 @@ class Environment
         Global.DefineVariable("pair?"   , Object(&isPairProc));
         Global.DefineVariable("procedure?", Object(&isProcedureProc));
         Global.DefineVariable("+", Object(&addProc));
+        Global.DefineVariable("-", Object(&subProc));
         Global.DefineVariable("=", Object(&areNumEqual));
         Global.DefineVariable("exit", Object(&exitProc));
     }
