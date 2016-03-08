@@ -49,16 +49,25 @@
 
 ### changes
 
-* v0.13  compound procedure support + lambda functions
-* v0.11  Initial support for primitive procedures (`+`)
-* v0.10  Support for the `if` form
-* v0.9   Forms `define` and `set!`
-* v0.8   Expression quoting
-* v0.7   Symbol literals
-* v0.6   List literals
-* v0.5   Empty list literal
-* v0.4   String literals
-* v0.3   Support for character literals
-* v0.2   Support for booleans #f and #t
-* v0.1   Support for integers
-
+* v0.13.1  More primitive procedures:
+    - `null?`
+    - `boolean?`
+    - `symbol?`
+    - `integer?`
+    - `char?`
+    - `string?`
+    - `pair?`
+    - `procedure?`
+    - `-`
+* v0.13   compound procedure support + lambda functions
+* v0.11   Initial support for primitive procedures (`+`)
+* v0.10   Support for the `if` form
+* v0.9    Forms `define` and `set!`
+* v0.8    Expression quoting
+* v0.7    Symbol literals
+* v0.6    List literals
+* v0.5    Empty list literal
+* v0.4    String literals
+* v0.3    Support for character literals
+* v0.2    Support for booleans #f and #t
+* v0.1    Support for integers
