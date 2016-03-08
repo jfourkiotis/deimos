@@ -5,100 +5,7 @@ import core.stdc.stdio;
 import core.stdc.ctype;
 import core.stdc.stdlib;
 
-class Environment
-{
-    Environment base;
-    Object[string] frame;
-
-    static this()
-    {
-        Empty = new Environment(null);
-        Global= Environment.Setup();
-    }
-
-    this(Environment base)
-    {
-        this.base = base;
-    }
-
-    Environment EnclosingEnvironment()
-    {
-        return base;
-    }
-
-    Object Lookup(string name)
-    {
-        if (name in frame)
-        {
-            return frame[name];
-        } else if (base)
-        {
-            return base.Lookup(name);
-        } else 
-        {
-            fprintf(stderr, "Unbound variable '%s'", name.ptr);
-            exit(-1);
-        }
-        assert(0);
-    }
-
-    void SetVariable(string name, Object value)
-    {
-        if (this == Empty)
-        {
-            fprintf(stderr, "Unbound variable '%s'", name.ptr);
-            exit(-1);
-        } else if (name in frame)
-        {
-            frame[name] = value;
-        } else if (base)
-        {
-            base.SetVariable(name, value);
-        } else 
-        {
-            fprintf(stderr, "Fatal error");
-            exit(-1);
-        }
-    }
-
-    void DefineVariable(string name, Object value)
-    {
-        frame[name] = value;
-    }
-
-    static Environment Extend(Object params, Object args, Environment env)
-    {
-        auto new_env = new Environment(env);
-
-        Object nil = Object(EmptyList());
-        while (params != nil)
-        {
-            string *symbol = car(params).peek!(string);
-            if (symbol)
-            {
-                new_env.DefineVariable(*symbol, car(args));
-            } else 
-            {
-                fprintf(stderr, "Invalid param");
-                exit(-1);
-            }
-            params = cdr(params);
-            args = cdr(args);
-        }
-
-        return new_env;
-    }
-
-    static Environment Setup()
-    {
-        return Extend(Object(EmptyList()), Object(EmptyList()), Empty);
-    }
-
-    static Environment Empty;
-    static Environment Global;
-}
-
-struct EmptyList {};
+struct EmptyList {}; // NIL
 
 class ConsCell
 {
@@ -126,6 +33,11 @@ class CompoundProc
     }
 }
 
+// scheme value
+// string type is used for symbols
+// char[] type is used for strings
+alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*), CompoundProc);
+
 Object car(Object object)
 {
     return (*object.peek!(ConsCell)).car;
@@ -140,11 +52,6 @@ Object cadr(Object object)
 {
     return car(cdr(object));
 }
-
-// scheme value
-// string type is used for symbols
-// char[] type is used for strings
-alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*), CompoundProc);
 
 bool isSymbol(Object object)
 {
@@ -166,6 +73,9 @@ struct Symbols
         OK    = Object("ok");
         IF    = Object("if");
         LAMBDA= Object("lambda");
+        NIL   = Object(EmptyList());
+        TRUE  = Object(true);
+        FALSE = Object(false);
     }
 
     static Object QUOTE;
@@ -174,6 +84,9 @@ struct Symbols
     static Object OK;
     static Object IF;
     static Object LAMBDA;
+    static Object NIL;
+    static Object TRUE;
+    static Object FALSE;
 }
 
 // READ
@@ -273,7 +186,7 @@ Object readPair(FILE *stream)
     int c = getc(stream);
     if (c == ')') 
     {
-        return Object(EmptyList());
+        return Symbols.NIL;
     }
     ungetc(c, stream);
 
@@ -319,9 +232,9 @@ Object read(FILE *stream)
         switch (c)
         {
             case 't':
-                return Object(true);
+                return Symbols.TRUE;
             case 'f':
-                return Object(false);
+                return Symbols.FALSE;
             case '\\':
                 return readCharacter(stream);
             default:
@@ -386,7 +299,7 @@ Object read(FILE *stream)
         return readPair(stream);
     } else if (c == '\'') /* read quoted expression */
     {
-        return Object(new ConsCell(Symbols.QUOTE, Object(new ConsCell(read(stream), Object(EmptyList())))));
+        return Object(new ConsCell(Symbols.QUOTE, Object(new ConsCell(read(stream), Symbols.NIL))));
     } else 
     {
         fprintf(stderr, "Bad input. Unexpected '%c'\n", c);
@@ -503,10 +416,10 @@ Object ifExpressionConsequent(Object expression)
 
 Object ifExpressionAlternative(Object expression)
 {
-    if (cdr(cdr(cdr(expression))) == Object(EmptyList()))
+    if (cdr(cdr(cdr(expression))) == Symbols.NIL)
     {
 
-        return Object(false);
+        return Symbols.FALSE;
     } else 
     {
         return cadr(cdr(cdr(expression)));
@@ -537,7 +450,7 @@ Object makeLambda(Object params, Object lbody)
 
 bool isLastExpression(Object seq)
 {
-    return cdr(seq) == Object(EmptyList());
+    return cdr(seq) == Symbols.NIL;
 }
 
 Object firstExpression(Object seq)
@@ -578,14 +491,14 @@ Object restOperands(Object ops)
 
 bool isNoOperands(Object ops)
 {
-    return ops == Object(EmptyList());
+    return ops == Symbols.NIL;
 }
 
 Object listOfValues(Object expressions, Environment env)
 {
     if (isNoOperands(expressions))
     {
-        return Object(EmptyList());
+        return Symbols.NIL;
     }
     auto first = eval(firstOperand(expressions), env);
     auto rest  = listOfValues(restOperands(expressions), env);
@@ -728,11 +641,12 @@ void print(Object obj)
    write(objToString(obj));
 }
 
+// ENVIRONMENT + PROCEDURES
 void addProc(Object *args, Object *ret)
 {
     long result = 0;
     Object current = *args;
-    while (current != Object(EmptyList()))
+    while (current != Symbols.NIL)
     {
         result += car(current).get!long;
         current = cdr(current);
@@ -744,21 +658,183 @@ void areNumEqual(Object *args, Object *ret)
 {
     Object current = *args;
     long value = car(current).get!(long);
-    while ((current = cdr(current)) != Object(EmptyList()))
+    while ((current = cdr(current)) != Symbols.NIL)
     {
         if (value != car(current).get!(long))
         {
-            *ret = Object(false);
+            *ret = Symbols.FALSE;
             return;
         }
     }
     *ret = Object(true);
 }
 
+void exitProc(Object *args, Object *ret)
+{
+    exit(-1);
+}
+
+void isNullProc(Object *args, Object *ret)
+{
+    auto tmp = car(*args);
+    if (tmp == Symbols.NIL)
+    {
+        *ret = Symbols.TRUE;
+    } else
+    {
+        *ret = Symbols.FALSE;
+    }
+}
+
+void isBooleanProc(Object *args, Object *ret)
+{
+    auto tmp = car(*args);
+    *ret = tmp.peek!(bool) !is null ? Symbols.TRUE : Symbols.FALSE;
+}
+
+void isSymbolProc(Object *args, Object *ret)
+{
+    auto tmp = car(*args);
+    *ret = tmp.peek!(string) !is null ? Symbols.TRUE : Symbols.FALSE;
+}
+
+void isIntegerProc(Object *args, Object *ret)
+{
+    auto tmp = car(*args);
+    *ret = tmp.peek!(long) !is null ? Symbols.TRUE : Symbols.FALSE;
+}
+
+void isCharProc(Object *args, Object *ret)
+{
+    auto tmp = car(*args);
+    *ret = tmp.peek!(char) !is null ? Symbols.TRUE : Symbols.FALSE;
+}
+
+void isStringProc(Object *args, Object *ret)
+{
+    auto tmp = car(*args);
+    *ret = tmp.peek!(char[]) !is null ? Symbols.TRUE : Symbols.FALSE;
+}
+
+void isPairProc(Object *args, Object *ret)
+{
+    auto tmp = car(*args);
+    *ret = tmp.peek!(ConsCell) !is null ? Symbols.TRUE : Symbols.FALSE;
+}
+
+void isProcedureProc(Object *args, Object *ret)
+{
+    auto tmp = car(*args);
+    *ret = tmp.peek!(void function(Object*, Object*)) !is null ? Symbols.TRUE : Symbols.FALSE;
+}   
+
+class Environment
+{
+    Environment base;
+    Object[string] frame;
+
+    static this()
+    {
+        Empty = new Environment(null);
+        Global= Environment.Setup();
+
+        Global.DefineVariable("null?"   , Object(&isNullProc));
+        Global.DefineVariable("boolean?", Object(&isBooleanProc));
+        Global.DefineVariable("symbol?" , Object(&isSymbolProc));
+        Global.DefineVariable("integer?", Object(&isIntegerProc));
+        Global.DefineVariable("char?"   , Object(&isCharProc));
+        Global.DefineVariable("string?" , Object(&isStringProc));
+        Global.DefineVariable("pair?"   , Object(&isPairProc));
+        Global.DefineVariable("procedure?", Object(&isProcedureProc));
+        Global.DefineVariable("+", Object(&addProc));
+        Global.DefineVariable("=", Object(&areNumEqual));
+        Global.DefineVariable("exit", Object(&exitProc));
+    }
+
+    this(Environment base)
+    {
+        this.base = base;
+    }
+
+    Environment EnclosingEnvironment()
+    {
+        return base;
+    }
+
+    Object Lookup(string name)
+    {
+        if (name in frame)
+        {
+            return frame[name];
+        } else if (base)
+        {
+            return base.Lookup(name);
+        } else 
+        {
+            fprintf(stderr, "Unbound variable '%s'", name.ptr);
+            exit(-1);
+        }
+        assert(0);
+    }
+
+    void SetVariable(string name, Object value)
+    {
+        if (this == Empty)
+        {
+            fprintf(stderr, "Unbound variable '%s'", name.ptr);
+            exit(-1);
+        } else if (name in frame)
+        {
+            frame[name] = value;
+        } else if (base)
+        {
+            base.SetVariable(name, value);
+        } else 
+        {
+            fprintf(stderr, "Fatal error");
+            exit(-1);
+        }
+    }
+
+    void DefineVariable(string name, Object value)
+    {
+        frame[name] = value;
+    }
+
+    static Environment Extend(Object params, Object args, Environment env)
+    {
+        auto new_env = new Environment(env);
+
+        Object nil = Symbols.NIL;
+        while (params != nil)
+        {
+            string *symbol = car(params).peek!(string);
+            if (symbol)
+            {
+                new_env.DefineVariable(*symbol, car(args));
+            } else 
+            {
+                fprintf(stderr, "Invalid param");
+                exit(-1);
+            }
+            params = cdr(params);
+            args = cdr(args);
+        }
+
+        return new_env;
+    }
+
+    static Environment Setup()
+    {
+        return Extend(Symbols.NIL, Symbols.NIL, Empty);
+    }
+
+    static Environment Empty;
+    static Environment Global;
+}//~ Environment
+
 void main()
 {
-    Environment.Global.DefineVariable("+", Object(&addProc));
-    Environment.Global.DefineVariable("=", Object(&areNumEqual));
 
     writeln("Welcome to Deimos Scheme. Use ctrl-c to exit.");
     while (true)
@@ -768,3 +844,4 @@ void main()
         write("\n");
     }
 }
+
