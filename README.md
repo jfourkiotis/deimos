@@ -58,6 +58,9 @@
     - `string?`
     - `pair?`
     - `procedure?`
+    - `cons`
+    - `car`
+    - `cdr`
     - `-`
 * v0.13   compound procedure support + lambda functions
 * v0.11   Initial support for primitive procedures (`+`)
