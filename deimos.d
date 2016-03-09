@@ -742,7 +742,6 @@ void isGreaterThanProc(Object *args, Object *ret)
         }
     }
     *ret = Symbols.TRUE;
-
 }
 
 void exitProc(Object *args, Object *ret)
@@ -819,6 +818,11 @@ void cdrProc(Object *args, Object *ret)
     *ret = cdr(car(*args));
 }
 
+void listProc(Object *args, Object *ret)
+{
+    *ret = *args;
+}
+
 class Environment
 {
     Environment base;
@@ -846,8 +850,9 @@ class Environment
         Global.DefineVariable("<", Object(&isLessThanProc));
         Global.DefineVariable(">", Object(&isGreaterThanProc));
         Global.DefineVariable("cons", Object(&consProc));
-        Global.DefineVariable("car", Object(&carProc));
-        Global.DefineVariable("cdr", Object(&cdrProc));
+        Global.DefineVariable("car" , Object(&carProc));
+        Global.DefineVariable("cdr" , Object(&cdrProc));
+        Global.DefineVariable("list", Object(&listProc));
         Global.DefineVariable("exit", Object(&exitProc));
     }
 
