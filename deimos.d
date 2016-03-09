@@ -803,6 +803,38 @@ void isProcedureProc(Object *args, Object *ret)
     *ret = tmp.peek!(void function(Object*, Object*)) !is null ? Symbols.TRUE : Symbols.FALSE;
 }   
 
+void charToIntegerProc(Object *args, Object *ret)
+{
+    *ret = to!long(car(*args).get!char);
+}
+
+void integerToCharProc(Object *args, Object *ret)
+{
+    *ret = to!char(car(*args).get!long);
+}
+
+void numberToStringProc(Object *args, Object *ret)
+{
+    *ret = to!string(car(*args).get!long);
+}
+
+void stringToNumberProc(Object *args, Object *ret)
+{
+    *ret = to!long(car(*args).get!string);
+}
+
+void symbolToStringProc(Object *args, Object *ret)
+{
+    char[] str = car(*args).get!string.dup;
+    *ret = Object(str);
+}
+
+void stringToSymbolProc(Object *args, Object *ret)
+{
+    string str = car(*args).get!(char[]).idup;
+    *ret = Object(str);
+}
+
 void consProc(Object *args, Object *ret)
 {
     *ret = Object(new ConsCell(car(*args), cadr(*args)));
@@ -823,6 +855,14 @@ void listProc(Object *args, Object *ret)
     *ret = *args;
 }
 
+void eqProc(Object *args, Object *ret)
+{
+    auto obj1 = car(*args);
+    auto obj2 = cadr(*args);
+    
+    *ret = obj1 == obj2 ? Symbols.TRUE : Symbols.FALSE;
+}
+
 class Environment
 {
     Environment base;
@@ -841,6 +881,12 @@ class Environment
         Global.DefineVariable("string?" , Object(&isStringProc));
         Global.DefineVariable("pair?"   , Object(&isPairProc));
         Global.DefineVariable("procedure?", Object(&isProcedureProc));
+        Global.DefineVariable("char->integer" , Object(&charToIntegerProc));
+        Global.DefineVariable("integer->char" , Object(&integerToCharProc));
+        Global.DefineVariable("number->string", Object(&numberToStringProc));
+        Global.DefineVariable("string->number", Object(&stringToNumberProc));
+        Global.DefineVariable("symbol->string", Object(&symbolToStringProc));
+        Global.DefineVariable("string->symbol", Object(&stringToSymbolProc));
         Global.DefineVariable("+", Object(&addProc));
         Global.DefineVariable("-", Object(&subProc));
         Global.DefineVariable("*", Object(&mulProc));
@@ -853,6 +899,7 @@ class Environment
         Global.DefineVariable("car" , Object(&carProc));
         Global.DefineVariable("cdr" , Object(&cdrProc));
         Global.DefineVariable("list", Object(&listProc));
+        Global.DefineVariable("eq?" , Object(&eqProc));
         Global.DefineVariable("exit", Object(&exitProc));
     }
 

@@ -76,6 +76,7 @@
     - `remainder`
     - `<`
     - `>`
+    - `eq?`
 * v0.13   compound procedure support + lambda functions
 * v0.11   Initial support for primitive procedures (`+`)
 * v0.10   Support for the `if` form
