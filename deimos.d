@@ -667,6 +667,28 @@ void subProc(Object *args, Object *ret)
     *ret = result;
 }
 
+void mulProc(Object *args, Object *ret)
+{
+    long result = 1;
+    Object current = *args;
+    while (current != Symbols.NIL)
+    {
+        result *= (car(current)).get!long;
+        current = cdr(current);
+    }
+    *ret = result;
+}
+
+void quotientProc(Object *args, Object *ret)
+{
+    *ret = car(*args).get!long / cadr(*args).get!long;
+}
+
+void remainderProc(Object *args, Object *ret)
+{
+    *ret = car(*args).get!long % cadr(*args).get!long;
+}
+
 void areNumEqual(Object *args, Object *ret)
 {
     Object current = *args;
@@ -680,6 +702,47 @@ void areNumEqual(Object *args, Object *ret)
         }
     }
     *ret = Object(true);
+}
+
+void isLessThanProc(Object *args, Object *ret)
+{
+    long previous, next;
+    Object current = *args;
+    previous = car(current).get!long;
+    while ((current = cdr(current)) != Symbols.NIL)
+    {
+        next = car(current).get!long;
+        if (previous < next) 
+        {
+            previous = next;
+        } else 
+        {
+            *ret = Symbols.FALSE;
+            return;
+        }
+    }
+    *ret = Symbols.TRUE;
+}
+
+void isGreaterThanProc(Object *args, Object *ret)
+{
+    long previous, next;
+    Object current = *args;
+    previous = car(current).get!long;
+    while ((current = cdr(current)) != Symbols.NIL)
+    {
+        next = car(current).get!long;
+        if (previous > next) 
+        {
+            previous = next;
+        } else 
+        {
+            *ret = Symbols.FALSE;
+            return;
+        }
+    }
+    *ret = Symbols.TRUE;
+
 }
 
 void exitProc(Object *args, Object *ret)
@@ -776,7 +839,12 @@ class Environment
         Global.DefineVariable("procedure?", Object(&isProcedureProc));
         Global.DefineVariable("+", Object(&addProc));
         Global.DefineVariable("-", Object(&subProc));
+        Global.DefineVariable("*", Object(&mulProc));
+        Global.DefineVariable("quotient", Object(&quotientProc));
+        Global.DefineVariable("remainder", Object(&remainderProc));
         Global.DefineVariable("=", Object(&areNumEqual));
+        Global.DefineVariable("<", Object(&isLessThanProc));
+        Global.DefineVariable(">", Object(&isGreaterThanProc));
         Global.DefineVariable("cons", Object(&consProc));
         Global.DefineVariable("car", Object(&carProc));
         Global.DefineVariable("cdr", Object(&cdrProc));
