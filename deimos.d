@@ -774,13 +774,21 @@ void addProc(Object *args, Object *ret)
 
 void subProc(Object *args, Object *ret)
 {
-	long result = 0;
     Object current = *args;
-    while (current != Symbols.NIL)
-    {
-        result -= car(current).get!long;
-		current = cdr(current);
-    }
+	long result;
+
+	if (cdr(current) == Symbols.NIL)
+	{
+		result = -car(current).get!long;
+	} else 
+	{
+		result =  car(current).get!long;
+	}
+	while ((current = cdr(current)) != Symbols.NIL)
+	{
+		result -= car(current).get!long;
+	}
+
     *ret = result;
 }
 
