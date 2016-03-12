@@ -76,6 +76,7 @@ struct Symbols
         NIL   = Object(EmptyList());
         TRUE  = Object(true);
         FALSE = Object(false);
+		BEGIN = Object("begin");
     }
 
     static Object QUOTE;
@@ -87,6 +88,7 @@ struct Symbols
     static Object NIL;
     static Object TRUE;
     static Object FALSE;
+	static Object BEGIN;
 }
 
 // READ
@@ -505,6 +507,22 @@ Object listOfValues(Object expressions, Environment env)
     return Object(new ConsCell(first, rest));
 }
 
+// begin
+Object makeBegin(Object expression)
+{
+	return Object(new ConsCell(Symbols.BEGIN, expression));
+}
+
+bool isBegin(Object expression)
+{
+	return isTaggedList(expression, Symbols.BEGIN);
+}
+
+Object beginActions(Object expression)
+{
+	return cdr(expression);
+}
+
 Object eval(Object expression, Environment env)
 {
 tailcall:
@@ -541,6 +559,16 @@ tailcall:
         auto params = lambdaParameters(expression);
         auto lbody  = lambdaBody(expression);
         return Object(new CompoundProc(params, lbody, env));
+	} else if (isBegin(expression))
+	{
+		expression = beginActions(expression);
+		while (!isLastExpression(expression))
+		{
+			eval(firstExpression(expression), env);
+			expression = restExpressions(expression);
+		}
+		expression = firstExpression(expression);
+		goto tailcall;
     } else if (isApplication(expression))
     {
         auto operator = applicationOperator(expression);
@@ -557,15 +585,8 @@ tailcall:
         {
             auto cp = *procedure.peek!(CompoundProc);
             env = Environment.Extend(cp.params, arguments, cp.env);
-            expression = cp.procBody;
-            while (!isLastExpression(expression))
-            {
-                eval(firstExpression(expression), env);
-                expression = restExpressions(expression);
-            }
-
-            expression = firstExpression(expression);
-            goto tailcall;
+			expression = makeBegin(cp.procBody);
+			goto tailcall;
         } else 
         {
             fprintf(stderr, "Unknown procedure type\n");

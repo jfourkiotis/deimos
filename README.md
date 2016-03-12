@@ -53,11 +53,14 @@
     ok
     > (fib 10)
     55
+	> (begin 1 2)
+	2
     > ^C
 
 ### changes
 
-* v0.13.1  More primitive procedures:
+* v0.14   Implemented the `begin` form
+* v0.13.1 More primitive procedures:
     - `null?`
     - `boolean?`
     - `symbol?`
@@ -66,6 +69,12 @@
     - `string?`
     - `pair?`
     - `procedure?`
+	- `integer->char`
+	- `char->integer`
+	- `number->string`
+	- `string->number`
+	- `symbol->string`
+	- `string->symbol`
     - `cons`
     - `car`
     - `cdr`
