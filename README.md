@@ -55,10 +55,15 @@
     55
 	> (begin 1 2)
 	2
+	> (cond (#f          1)
+	        ((eq? #t #t) 2)
+			(else        3))
+	2
     > ^C
 
 ### changes
 
+* v0.15   Implemented the `cond` form
 * v0.14   Implemented the `begin` form
 * v0.13.1 More primitive procedures:
     - `null?`

@@ -77,6 +77,8 @@ struct Symbols
         TRUE  = Object(true);
         FALSE = Object(false);
 		BEGIN = Object("begin");
+		COND  = Object("cond");
+		ELSE  = Object("else");
     }
 
     static Object QUOTE;
@@ -89,6 +91,8 @@ struct Symbols
     static Object TRUE;
     static Object FALSE;
 	static Object BEGIN;
+	static Object COND;
+	static Object ELSE;
 }
 
 // READ
@@ -406,6 +410,21 @@ bool isIfExpression(Object expression)
     return isTaggedList(expression, Symbols.IF);
 }
 
+Object makeIfExpression(Object pred, Object consequent, Object alternative)
+{
+	return Object(
+			new ConsCell(
+				Symbols.IF, 
+			    Object(
+					new ConsCell(
+						pred,
+  		                Object(
+							new ConsCell(
+								consequent,
+								Object(
+									new ConsCell(alternative, Symbols.NIL))))))));
+}
+
 Object ifExpressionPredicate(Object expression)
 {
     return cadr(expression);
@@ -427,6 +446,8 @@ Object ifExpressionAlternative(Object expression)
         return cadr(cdr(cdr(expression)));
     }
 }
+
+
 
 // lambda
 // (lambda (<args>) <body>)
@@ -523,6 +544,78 @@ Object beginActions(Object expression)
 	return cdr(expression);
 }
 
+// cond
+bool isCond(Object expression)
+{
+	return isTaggedList(expression, Symbols.COND);
+}
+
+Object condClauses(Object cond)
+{
+	return cdr(cond);
+}
+
+Object condPredicate(Object clause)
+{
+	return car(clause);
+}
+
+Object condActions(Object clause)
+{
+	return cdr(clause);
+}
+
+bool isCondElseClause(Object clause)
+{
+	return condPredicate(clause) == Symbols.ELSE;
+}
+
+Object transformSequenceToExpression(Object sequence)
+{
+	if (sequence == Symbols.NIL)
+	{
+		return sequence;
+	} else if (isLastExpression(sequence))
+	{
+		return firstExpression(sequence);
+	} else 
+	{
+		return makeBegin(sequence);
+	}
+}
+
+
+Object expandCondClauses(Object clauses)
+{
+	if (clauses == Symbols.NIL) return Symbols.FALSE;
+
+	auto firstClause = car(clauses);
+	auto restClauses = cdr(clauses);
+
+	if (isCondElseClause(firstClause))
+	{
+		if (restClauses == Symbols.NIL)
+		{
+			return transformSequenceToExpression(condActions(firstClause));
+		} else 
+		{
+			fprintf(stderr, "Else clause isn't last");
+			exit(-1);
+			assert(0);
+		}
+	} else 
+	{
+		return makeIfExpression(condPredicate(firstClause), 
+				      transformSequenceToExpression(condActions(firstClause)),
+					  expandCondClauses(restClauses));
+	}
+}
+
+Object transformCondToIf(Object cond)
+{
+	return expandCondClauses(condClauses(cond));
+}
+
 Object eval(Object expression, Environment env)
 {
 tailcall:
@@ -568,6 +661,10 @@ tailcall:
 			expression = restExpressions(expression);
 		}
 		expression = firstExpression(expression);
+		goto tailcall;
+	} else if (isCond(expression))
+	{
+		expression = transformCondToIf(expression);
 		goto tailcall;
     } else if (isApplication(expression))
     {
