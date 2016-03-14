@@ -53,6 +53,11 @@ Object cadr(Object object)
     return car(cdr(object));
 }
 
+Object cddr(Object object)
+{
+    return cdr(cdr(object));
+}
+
 bool isSymbol(Object object)
 {
     return object.peek!(string) !is null;
@@ -76,9 +81,10 @@ struct Symbols
         NIL   = Object(EmptyList());
         TRUE  = Object(true);
         FALSE = Object(false);
-		BEGIN = Object("begin");
-		COND  = Object("cond");
-		ELSE  = Object("else");
+	BEGIN = Object("begin");
+	COND  = Object("cond");
+	ELSE  = Object("else");
+        LET   = Object("let");
     }
 
     static Object QUOTE;
@@ -90,9 +96,10 @@ struct Symbols
     static Object NIL;
     static Object TRUE;
     static Object FALSE;
-	static Object BEGIN;
-	static Object COND;
-	static Object ELSE;
+    static Object BEGIN;
+    static Object COND;
+    static Object ELSE;
+    static Object LET;
 }
 
 // READ
@@ -528,6 +535,71 @@ Object listOfValues(Object expressions, Environment env)
     return Object(new ConsCell(first, rest));
 }
 
+// let
+bool isLetExpression(Object expression)
+{
+    return isTaggedList(expression, Symbols.LET);
+}
+
+Object letBindings(Object expression)
+{
+    return cadr(expression);
+}
+
+Object letBody(Object expression)
+{
+    return cddr(expression);
+}
+
+Object bindingsParameter(Object binding)
+{
+    return car(binding);
+}
+
+Object bindingsArgument(Object binding)
+{
+    return cadr(binding);
+}
+
+Object makeApplication(Object operator, Object operands)
+{
+    return Object(new ConsCell(operator, operands));
+}
+
+Object bindingsParameters(Object bindings)
+{
+    return bindings == Symbols.NIL ? Symbols.NIL
+                                   : Object(new ConsCell(
+                                               bindingsParameter(car(bindings)),
+                                               bindingsParameters(cdr(bindings))));        
+}
+
+Object bindingsArguments(Object bindings)
+{
+    return bindings == Symbols.NIL ? Symbols.NIL
+                                   : Object(new ConsCell(
+                                               bindingsArgument(car(bindings)),
+                                               bindingsArguments(cdr(bindings))));        
+}
+
+Object letParameters(Object expression)
+{
+    return bindingsParameters(letBindings(expression));
+}
+
+Object letArguments(Object expression)
+{
+    return bindingsArguments(letBindings(expression));
+}
+
+Object letToApplication(Object expression)
+{
+    return makeApplication(
+            makeLambda(letParameters(expression),
+                       letBody(expression)),
+            letArguments(expression));
+}
+
 // begin
 Object makeBegin(Object expression)
 {
@@ -652,20 +724,24 @@ tailcall:
         auto params = lambdaParameters(expression);
         auto lbody  = lambdaBody(expression);
         return Object(new CompoundProc(params, lbody, env));
-	} else if (isBegin(expression))
-	{
-		expression = beginActions(expression);
-		while (!isLastExpression(expression))
-		{
-			eval(firstExpression(expression), env);
-			expression = restExpressions(expression);
-		}
-		expression = firstExpression(expression);
-		goto tailcall;
-	} else if (isCond(expression))
-	{
-		expression = transformCondToIf(expression);
-		goto tailcall;
+    } else if (isBegin(expression))
+    {
+        expression = beginActions(expression);
+        while (!isLastExpression(expression))
+        {
+            eval(firstExpression(expression), env);
+            expression = restExpressions(expression);
+        }
+        expression = firstExpression(expression);
+        goto tailcall;
+    } else if (isCond(expression))
+    {
+        expression = transformCondToIf(expression);
+        goto tailcall;
+    } else if (isLetExpression(expression))
+    {
+        expression = letToApplication(expression);
+        goto tailcall;
     } else if (isApplication(expression))
     {
         auto operator = applicationOperator(expression);
