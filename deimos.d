@@ -1,4 +1,4 @@
-import std.stdio : writeln, write;
+import std.stdio : writeln, write, File;
 import std.conv;
 import std.variant;
 import core.stdc.stdio;
@@ -36,7 +36,7 @@ class CompoundProc
 // scheme value
 // string type is used for symbols
 // char[] type is used for strings
-alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*), CompoundProc, Environment);
+alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*), CompoundProc, Environment, void *);
 
 Object car(Object object)
 {
@@ -317,6 +317,8 @@ Object read(FILE *stream)
     } else if (c == '\'') /* read quoted expression */
     {
         return Object(new ConsCell(Symbols.QUOTE, Object(new ConsCell(read(stream), Symbols.NIL))));
+    } else if (c == EOF) {
+        return Object(cast(void *)null);
     } else 
     {
         fprintf(stderr, "Bad input. Unexpected '%c'\n", c);
@@ -969,7 +971,8 @@ string objToString(Object obj)
             (ConsCell cell)   => "(" ~ cellToString(cell) ~ ")",
             (void function(Object*, Object*) prim) => "<#procedure>",
             (CompoundProc cp) => "<#compound-procedure>",
-            (Environment env) => "<#environment>");
+            (Environment env) => "<#environment>", 
+            (void *fatal_error) => "???");
 }
 
 void print(Object obj)
@@ -1090,6 +1093,16 @@ void isGreaterThanProc(Object *args, Object *ret)
 void exitProc(Object *args, Object *ret)
 {
     exit(-1);
+}
+
+void loadProc(Object *args, Object *ret)
+{
+    auto file = File(car(*args).get!(char[]), "r");
+    Object expression;
+    while ((expression = read(file.getFP())).peek!(void *) is null)
+    {
+        *ret = eval(expression, Environment.Global);
+    }
 }
 
 void isNullProc(Object *args, Object *ret)
@@ -1330,6 +1343,7 @@ class Environment
         env.DefineVariable("null-environment", Object(&nullEnvProc));
         env.DefineVariable("environment", Object(&environmentProc));
         env.DefineVariable("eval", Object(&evalProc));
+        env.DefineVariable("load", Object(&loadProc));
         env.DefineVariable("exit", Object(&exitProc));
 
     }

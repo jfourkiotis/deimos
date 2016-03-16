@@ -77,6 +77,8 @@
 
 ### changes
 
+* v0.20a  I/O procs added:
+    - `load`
 * v0.19   Implemented the `eval` primitive. Primitive functions added:
     - `environment`
     - `interaction-environment`
