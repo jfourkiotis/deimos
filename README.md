@@ -45,11 +45,9 @@
     3
     > add
     #<compound-procedure>
-    > (define (fib n) (if (= n 1)
+    > (define (fib n) (if (or (= n 1) (= n 2))
                           1
-                          (if (= n 2)
-                              1
-                              (+ (fib (- n 1)) (fib (- n 2))))))
+                          (+ (fib (- n 1)) (fib (- n 2)))))
     ok
     > (fib 10)
     55
@@ -62,11 +60,29 @@
     > (let ((x (+ 1 1))
             (y (- 5 2)))
         (+ x y))
-    > 5
+    5
+    > (and 1 2 #f 3)
+    #f
+    > (or #f #f 3 #f)
+    3
+    > (apply + '(1 2 3))
+    6
+    > (define env (environment))
+    ok
+    > (eval '(define z 25) env)
+    ok
+    > (eval 'z env)
+    25
     > ^C
 
 ### changes
 
+* v0.19   Implemented the `eval` primitive. Primitive functions added:
+    - `environment`
+    - `interaction-environment`
+    - `null-environment`
+* v0.18   Implemented the `apply` primitive
+* v0.17   Implemented `or` and `and` as forms
 * v0.16   Implemented the `let` form
 * v0.15   Implemented the `cond` form
 * v0.14   Implemented the `begin` form

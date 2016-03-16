@@ -36,7 +36,7 @@ class CompoundProc
 // scheme value
 // string type is used for symbols
 // char[] type is used for strings
-alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*), CompoundProc);
+alias Object = Algebraic!(long, bool, char, string, char[], EmptyList, ConsCell, void function(This*, This*), CompoundProc, Environment);
 
 Object car(Object object)
 {
@@ -85,6 +85,8 @@ struct Symbols
 	COND  = Object("cond");
 	ELSE  = Object("else");
         LET   = Object("let");
+        AND   = Object("and");
+        OR    = Object("or");
     }
 
     static Object QUOTE;
@@ -100,6 +102,8 @@ struct Symbols
     static Object COND;
     static Object ELSE;
     static Object LET;
+    static Object AND;
+    static Object OR;
 }
 
 // READ
@@ -321,7 +325,6 @@ Object read(FILE *stream)
     assert(0);
 }
 
-// EVAL
 bool isSelfEvaluating(Object expression)
 {
     return expression.peek!(bool) != null || 
@@ -420,16 +423,16 @@ bool isIfExpression(Object expression)
 Object makeIfExpression(Object pred, Object consequent, Object alternative)
 {
 	return Object(
-			new ConsCell(
-				Symbols.IF, 
-			    Object(
-					new ConsCell(
-						pred,
-  		                Object(
-							new ConsCell(
-								consequent,
-								Object(
-									new ConsCell(alternative, Symbols.NIL))))))));
+                new ConsCell(
+                    Symbols.IF, 
+                    Object(
+                        new ConsCell(
+                            pred,
+                            Object(
+                                new ConsCell(
+                                    consequent,
+                                    Object(
+                                        new ConsCell(alternative, Symbols.NIL))))))));
 }
 
 Object ifExpressionPredicate(Object expression)
@@ -454,7 +457,26 @@ Object ifExpressionAlternative(Object expression)
     }
 }
 
+// and/or
+bool isAndExpression(Object expression)
+{
+    return isTaggedList(expression, Symbols.AND);
+}
 
+Object andTests(Object and)
+{
+    return cdr(and);
+}
+
+bool isOrExpression(Object expression)
+{
+    return isTaggedList(expression, Symbols.OR);
+}
+
+Object orTests(Object or)
+{
+    return cdr(or);
+}
 
 // lambda
 // (lambda (<args>) <body>)
@@ -688,6 +710,68 @@ Object transformCondToIf(Object cond)
 	return expandCondClauses(condClauses(cond));
 }
 
+// APPLY
+void applyProc(Object *args, Object *ret)
+{
+    fprintf(stderr, "Illegal state: The body of the `apply` proc should not execute");
+    exit(-1);
+}
+
+void interactionEnvProc(Object *args, Object *ret)
+{
+    *ret = Object(Environment.Global);
+}
+
+void nullEnvProc(Object *args, Object *ret)
+{
+    *ret = Object(Environment.Setup());
+}
+
+void environmentProc(Object *args, Object *ret)
+{
+    *ret = Object(Environment.Make());
+}
+
+void evalProc(Object *args, Object *ret)
+{
+    fprintf(stderr, "Illegal state: The body of the `eval` proc should not execute");
+    exit(-1);
+}
+
+Object applyOperator(Object arguments)
+{
+    return car(arguments);
+}
+
+Object prepareApplyOperands(Object arguments)
+{
+    if (cdr(arguments) == Symbols.NIL)
+    {
+        return car(arguments);
+    } else
+    {
+        auto fst = car(arguments);
+        auto snd = prepareApplyOperands(cdr(arguments));
+        return Object(new ConsCell(fst, snd));
+    }
+}
+
+Object applyOperands(Object arguments)
+{
+    return prepareApplyOperands(cdr(arguments));
+}
+
+Object evalExpression(Object arguments)
+{
+    return car(arguments);
+}
+
+Environment evalEnvironment(Object arguments)
+{
+    return cadr(arguments).get!Environment;
+}
+
+// EVAL
 Object eval(Object expression, Environment env)
 {
 tailcall:
@@ -742,12 +826,69 @@ tailcall:
     {
         expression = letToApplication(expression);
         goto tailcall;
+    } else if (isAndExpression(expression))
+    {
+        expression = andTests(expression);
+        if (expression == Symbols.NIL)
+        {
+            return Symbols.TRUE;
+        }
+        while (!isLastExpression(expression))
+        {
+            auto result = eval(firstExpression(expression), env);
+            if (result == Symbols.FALSE)
+            {
+                return result;
+            }
+            expression = restExpressions(expression);
+        }
+        expression = firstExpression(expression);
+        goto tailcall;
+    } else if (isOrExpression(expression))
+    {
+        expression = orTests(expression);
+        if (expression == Symbols.NIL)
+        {
+            return Symbols.FALSE;
+        }
+        while (!isLastExpression(expression))
+        {
+            auto result = eval(firstExpression(expression), env);
+            if (result != Symbols.FALSE)
+            {
+                return result;
+            }
+            expression = restExpressions(expression);
+        }
+        expression = firstExpression(expression);
+        goto tailcall;
     } else if (isApplication(expression))
     {
         auto operator = applicationOperator(expression);
         auto procedure= eval(operator, env);
         auto operands = applicationOperands(expression);
         auto arguments= listOfValues(operands, env);
+
+        if (procedure.peek!(void function(Object *, Object *)) !is null)
+        {
+            auto proc = procedure.get!(void function(Object *, Object *));
+            if (proc == &evalProc)
+            {
+                expression = evalExpression(arguments);
+                env = evalEnvironment(arguments);
+                goto tailcall;
+            }
+        }
+
+        if (procedure.peek!(void function(Object *, Object *)) !is null)
+        {
+            auto proc = procedure.get!(void function(Object *, Object *));
+            if (proc == &applyProc)
+            {
+                procedure = applyOperator(arguments);
+                arguments = applyOperands(arguments);
+            }
+        }
 
         if (procedure.peek!(void function(Object *, Object *)) !is null)
         {
@@ -827,7 +968,8 @@ string objToString(Object obj)
             (EmptyList empty) => "()"    ,
             (ConsCell cell)   => "(" ~ cellToString(cell) ~ ")",
             (void function(Object*, Object*) prim) => "<#procedure>",
-            (CompoundProc cp) => "<#compound-procedure>");
+            (CompoundProc cp) => "<#compound-procedure>",
+            (Environment env) => "<#environment>");
 }
 
 void print(Object obj)
@@ -1072,36 +1214,8 @@ class Environment
     static this()
     {
         Empty = new Environment(null);
-        Global= Environment.Setup();
+        Global= Environment.Make();
 
-        Global.DefineVariable("null?"   , Object(&isNullProc));
-        Global.DefineVariable("boolean?", Object(&isBooleanProc));
-        Global.DefineVariable("symbol?" , Object(&isSymbolProc));
-        Global.DefineVariable("integer?", Object(&isIntegerProc));
-        Global.DefineVariable("char?"   , Object(&isCharProc));
-        Global.DefineVariable("string?" , Object(&isStringProc));
-        Global.DefineVariable("pair?"   , Object(&isPairProc));
-        Global.DefineVariable("procedure?", Object(&isProcedureProc));
-        Global.DefineVariable("char->integer" , Object(&charToIntegerProc));
-        Global.DefineVariable("integer->char" , Object(&integerToCharProc));
-        Global.DefineVariable("number->string", Object(&numberToStringProc));
-        Global.DefineVariable("string->number", Object(&stringToNumberProc));
-        Global.DefineVariable("symbol->string", Object(&symbolToStringProc));
-        Global.DefineVariable("string->symbol", Object(&stringToSymbolProc));
-        Global.DefineVariable("+", Object(&addProc));
-        Global.DefineVariable("-", Object(&subProc));
-        Global.DefineVariable("*", Object(&mulProc));
-        Global.DefineVariable("quotient", Object(&quotientProc));
-        Global.DefineVariable("remainder", Object(&remainderProc));
-        Global.DefineVariable("=", Object(&areNumEqual));
-        Global.DefineVariable("<", Object(&isLessThanProc));
-        Global.DefineVariable(">", Object(&isGreaterThanProc));
-        Global.DefineVariable("cons", Object(&consProc));
-        Global.DefineVariable("car" , Object(&carProc));
-        Global.DefineVariable("cdr" , Object(&cdrProc));
-        Global.DefineVariable("list", Object(&listProc));
-        Global.DefineVariable("eq?" , Object(&eqProc));
-        Global.DefineVariable("exit", Object(&exitProc));
     }
 
     this(Environment base)
@@ -1180,6 +1294,51 @@ class Environment
     static Environment Setup()
     {
         return Extend(Symbols.NIL, Symbols.NIL, Empty);
+    }
+
+    static void Populate(Environment env)
+    {
+        env.DefineVariable("null?"   , Object(&isNullProc));
+        env.DefineVariable("boolean?", Object(&isBooleanProc));
+        env.DefineVariable("symbol?" , Object(&isSymbolProc));
+        env.DefineVariable("integer?", Object(&isIntegerProc));
+        env.DefineVariable("char?"   , Object(&isCharProc));
+        env.DefineVariable("string?" , Object(&isStringProc));
+        env.DefineVariable("pair?"   , Object(&isPairProc));
+        env.DefineVariable("procedure?", Object(&isProcedureProc));
+        env.DefineVariable("char->integer" , Object(&charToIntegerProc));
+        env.DefineVariable("integer->char" , Object(&integerToCharProc));
+        env.DefineVariable("number->string", Object(&numberToStringProc));
+        env.DefineVariable("string->number", Object(&stringToNumberProc));
+        env.DefineVariable("symbol->string", Object(&symbolToStringProc));
+        env.DefineVariable("string->symbol", Object(&stringToSymbolProc));
+        env.DefineVariable("+", Object(&addProc));
+        env.DefineVariable("-", Object(&subProc));
+        env.DefineVariable("*", Object(&mulProc));
+        env.DefineVariable("quotient", Object(&quotientProc));
+        env.DefineVariable("remainder", Object(&remainderProc));
+        env.DefineVariable("=", Object(&areNumEqual));
+        env.DefineVariable("<", Object(&isLessThanProc));
+        env.DefineVariable(">", Object(&isGreaterThanProc));
+        env.DefineVariable("cons", Object(&consProc));
+        env.DefineVariable("car" , Object(&carProc));
+        env.DefineVariable("cdr" , Object(&cdrProc));
+        env.DefineVariable("list", Object(&listProc));
+        env.DefineVariable("eq?" , Object(&eqProc));
+        env.DefineVariable("apply", Object(&applyProc));
+        env.DefineVariable("interaction-environment", Object(&interactionEnvProc));
+        env.DefineVariable("null-environment", Object(&nullEnvProc));
+        env.DefineVariable("environment", Object(&environmentProc));
+        env.DefineVariable("eval", Object(&evalProc));
+        env.DefineVariable("exit", Object(&exitProc));
+
+    }
+
+    static Environment Make()
+    {
+        auto env = Setup();
+        Populate(env);
+        return env;
     }
 
     static Environment Empty;
