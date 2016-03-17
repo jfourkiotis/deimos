@@ -1105,6 +1105,20 @@ void loadProc(Object *args, Object *ret)
     }
 }
 
+void setcarProc(Object *args, Object *ret)
+{
+    ConsCell cell = car(*args).get!ConsCell;
+    cell.car = cadr(*args);
+    *ret = Symbols.OK;
+}
+
+void setcdrProc(Object *args, Object *ret)
+{
+    ConsCell cell = car(*args).get!ConsCell;
+    cell.cdr = cadr(*args);
+    *ret = Symbols.OK;
+}
+
 void isNullProc(Object *args, Object *ret)
 {
     auto tmp = car(*args);
@@ -1344,6 +1358,8 @@ class Environment
         env.DefineVariable("environment", Object(&environmentProc));
         env.DefineVariable("eval", Object(&evalProc));
         env.DefineVariable("load", Object(&loadProc));
+        env.DefineVariable("set-car!", Object(&setcarProc));
+        env.DefineVariable("set-cdr!", Object(&setcdrProc));
         env.DefineVariable("exit", Object(&exitProc));
 
     }

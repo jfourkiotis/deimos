@@ -77,6 +77,7 @@
 
 ### changes
 
+* v0.20b  `set-car!` and `set-cdr!` primitive procs added
 * v0.20a  I/O procs added:
     - `load`
 * v0.19   Implemented the `eval` primitive. Primitive functions added:
